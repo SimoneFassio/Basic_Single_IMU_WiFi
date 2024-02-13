@@ -6,7 +6,7 @@
  
 #include "NMEAParser.h"
 #include <Wire.h>
-#include "BNO08x_AOG.h"
+//#include "BNO08x_AOG.h"
 #include <Arduino.h>
 #include <WiFiManager.h>
 #include <WiFi.h>
@@ -88,7 +88,6 @@ bool relPosReady = false;
 const uint8_t bno08xAddresses[] = { 0x4A,0x4B };
 const int16_t nrBNO08xAdresses = sizeof(bno08xAddresses) / sizeof(bno08xAddresses[0]);
 uint8_t bno08xAddress;
-BNO080 bno08x;
 
 //Dual 
 double headingcorr = 900;  //90deg heading correction (90deg*10)
@@ -122,6 +121,56 @@ float pitch, pitchSum;
 
 float bno08xHeading = 0;
 int16_t bno08xHeading10x = 0;
+
+//New BNO08X handler
+#include <Adafruit_BNO08x.h>
+#define BNO08X_RESET -1
+#define RAD__TO__DEG 57.295779513082320876798154814105f
+struct euler_t {
+  float yaw;
+  float pitch;
+  float roll;
+} ypr;
+
+Adafruit_BNO08x  bno08x(BNO08X_RESET);
+sh2_SensorValue_t sensorValue;
+// Top frequency is about 250Hz but this report is more accurate
+  sh2_SensorId_t reportType = SH2_ARVR_STABILIZED_RV;
+  long reportIntervalUs = 5000;
+void setReports(sh2_SensorId_t reportType, long report_interval) {
+  Serial.println("Setting desired reports");
+  if (! bno08x.enableReport(reportType, report_interval)) {
+    Serial.println("Could not enable stabilized remote vector");
+  }
+  if (!bno08x.enableReport(SH2_GYROSCOPE_CALIBRATED)) {
+    Serial.println("Could not enable raw gyroscope");
+  }
+}
+void quaternionToEuler(float qr, float qi, float qj, float qk, euler_t* ypr, bool degrees = false) {
+
+    float sqr = sq(qr);
+    float sqi = sq(qi);
+    float sqj = sq(qj);
+    float sqk = sq(qk);
+
+    ypr->yaw = atan2(2.0 * (qi * qj + qk * qr), (sqi - sqj - sqk + sqr));
+    ypr->pitch = asin(-2.0 * (qi * qk - qj * qr) / (sqi + sqj + sqk + sqr));
+    ypr->roll = atan2(2.0 * (qj * qk + qi * qr), (-sqi - sqj + sqk + sqr));
+
+    if (degrees) {
+      ypr->yaw *= RAD__TO__DEG;
+      ypr->pitch *= RAD__TO__DEG;
+      ypr->roll *= RAD__TO__DEG;
+    }
+}
+
+void quaternionToEulerRV(sh2_RotationVectorWAcc_t* rotational_vector, euler_t* ypr, bool degrees = false) {
+    quaternionToEuler(rotational_vector->real, rotational_vector->i, rotational_vector->j, rotational_vector->k, ypr, degrees);
+}
+
+void quaternionToEulerGI(sh2_GyroIntegratedRV_t* rotational_vector, euler_t* ypr, bool degrees = false) {
+    quaternionToEuler(rotational_vector->real, rotational_vector->i, rotational_vector->j, rotational_vector->k, ypr, degrees);
+}
 
 // Declare functions
 
@@ -166,7 +215,7 @@ void setup()
     parser.addHandler("G-VTG", VTG_Handler);
 
     //Wire.begin(I2C_SDA, I2C_SCL);
-    Wire.begin();
+    //Wire.begin();
     delay(1000);
     pinMode(26, OUTPUT);
     pinMode(deBugPin, INPUT_PULLUP);
@@ -179,28 +228,28 @@ void setup()
     
     //test if CMPS working
     uint8_t error;
-    if(deBug) Serial.println("Checking for CMPS14");
-    Wire.beginTransmission(CMPS14_ADDRESS);
-    error = Wire.endTransmission();
+    //if(deBug) Serial.println("Checking for CMPS14");
+    //Wire.beginTransmission(CMPS14_ADDRESS);
+    //error = Wire.endTransmission();
 
-    if (error == 0)
-    {
-        if(deBug) {
-          Serial.println("Error = 0");
-          Serial.print("CMPS14 ADDRESs: 0x");
-          Serial.println(CMPS14_ADDRESS, HEX);
-          Serial.println("CMPS14 Ok.");
-        } 
-        useCMPS = true;
-        digitalWrite(imuLED, HIGH);
-    }
-    else
-    {
-        if(deBug) {
-          Serial.println("Error = 4");
-          Serial.println("CMPS not Connected or Found"); 
-        }
-    }
+    // if (error == 0)
+    // {
+    //     if(deBug) {
+    //       Serial.println("Error = 0");
+    //       Serial.print("CMPS14 ADDRESs: 0x");
+    //       Serial.println(CMPS14_ADDRESS, HEX);
+    //       Serial.println("CMPS14 Ok.");
+    //     } 
+    //     useCMPS = true;
+    //     digitalWrite(imuLED, HIGH);
+    // }
+    // else
+    // {
+    //     if(deBug) {
+    //       Serial.println("Error = 4");
+    //       Serial.println("CMPS not Connected or Found"); 
+    //     }
+    // }
 
     if (!useCMPS)
     {
@@ -211,10 +260,7 @@ void setup()
             Serial.print("\r\nChecking for BNO08X on ");
             Serial.println(bno08xAddress, HEX);
           }
-            Wire.beginTransmission(bno08xAddress);
-            error = Wire.endTransmission();
-
-            if (error == 0)
+            if (bno08x.begin_I2C(bno08xAddress))
             {
               if(deBug) {
                 Serial.println("Error = 0");
@@ -222,35 +268,11 @@ void setup()
                 Serial.println(bno08xAddress, HEX);
                 Serial.println("BNO08X Ok.");
               }
-                          // Initialize BNO080 lib        
-                if (bno08x.begin(bno08xAddress))
-                {
-                    Wire.setClock(400000); //Increase I2C data rate to 400kHz
+        
+                    
+                    setReports(reportType, reportIntervalUs);
+                    useBNO08x = true;
 
-            // Use gameRotationVector
-            bno08x.enableGyro(GYRO_LOOP_TIME);
-            bno08x.enableGameRotationVector(GYRO_LOOP_TIME-1);
-                       
-            // Retrieve the getFeatureResponse report to check if Rotation vector report is corectly enable
-            if (bno08x.getFeatureResponseAvailable() == true)
-            {
-              if (bno08x.checkReportEnable(SENSOR_REPORTID_GYRO_INTEGRATED_ROTATION_VECTOR, (GYRO_LOOP_TIME-1)) == false) bno08x.printGetFeatureResponse();
-              if (bno08x.checkReportEnable(SENSOR_REPORTID_GAME_ROTATION_VECTOR, (GYRO_LOOP_TIME-1)) == false) bno08x.printGetFeatureResponse();
-
-              // Break out of loop
-              useBNO08x = true;
-              digitalWrite(imuLED, HIGH);
-              break;
-            }
-                    else
-                    {
-                        if(deBug) Serial.println("BNO08x init fails!!");
-                    }
-                }
-                else
-                {
-                    if(deBug) Serial.println("BNO080 not detected at given I2C address.");
-                }
             }
             else
             {
@@ -505,12 +527,27 @@ void GyroHandler(uint32_t delta)
       
       else if (useBNO08x)
         {
-        if (bno08x.dataAvailable() == true)
-          {
-            gyro = (bno08x.getGyroZ()) * RAD_TO_DEG; // Get raw yaw rate
+        if (bno08x.getSensorEvent(&sensorValue)) {
+        // in this demo only one report type will be received depending on FAST_MODE define (above)
+        switch (sensorValue.sensorId) {
+          case SH2_ARVR_STABILIZED_RV:
+            quaternionToEulerRV(&sensorValue.un.arvrStabilizedRV, &ypr, false);
+          case SH2_GYRO_INTEGRATED_RV:
+            // faster (more noise?)
+            quaternionToEulerGI(&sensorValue.un.gyroIntegratedRV, &ypr, false);
+            break;
+          case SH2_GYROSCOPE_CALIBRATED:
+    // Serial.print("Gyro - x: ");
+    // Serial.print(sensorValue.un.gyroscope.x);
+    // Serial.print(" y: ");
+    // Serial.print(sensorValue.un.gyroscope.y);
+    // Serial.print(" z: ");
+    // Serial.println(sensorValue.un.gyroscope.z);
+            gyro = sensorValue.un.gyroscope.z * RAD__TO__DEG;
             gyro = gyro * -10;
-
-            bno08xHeading = (bno08x.getYaw()) * RAD_TO_DEG; // Convert yaw / heading to degrees
+            break;
+        }
+            bno08xHeading = (ypr.yaw) * RAD__TO__DEG; // Convert yaw / heading to degrees
             bno08xHeading = -bno08xHeading; //BNO085 counter clockwise data to clockwise data
 
             if (bno08xHeading < 0 && bno08xHeading >= -180) //Scale BNO085 yaw from [-180�;180�] to [0;360�]
@@ -519,12 +556,12 @@ void GyroHandler(uint32_t delta)
             }
 
             if (swapRollPitch){
-            roll = (bno08x.getPitch()) * RAD_TO_DEG;
-            pitch = (bno08x.getRoll()) * RAD_TO_DEG;
+            roll = (ypr.pitch) * RAD__TO__DEG;
+            pitch = (ypr.roll) * RAD__TO__DEG;
             }
             else{
-            roll = (bno08x.getRoll()) * RAD_TO_DEG;
-            pitch = (bno08x.getPitch()) * RAD_TO_DEG;
+            roll = (ypr.roll) * RAD__TO__DEG;
+            pitch = (ypr.pitch) * RAD__TO__DEG;
             pitch = pitch * -1;
             }
 
