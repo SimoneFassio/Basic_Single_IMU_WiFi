@@ -14,7 +14,7 @@
 
 /************************* User Settings *************************/
 #define deBugPin   27
-bool deBug = false;
+bool deBug = true;
 
 // LED settings
 #define pwrLED 32
@@ -24,11 +24,11 @@ bool deBug = false;
 
 //Serial Ports
 #define SerialGPS Serial1   //1st F9P 10hz GGA,VTG + 1074,1084,1094,1230,4072.0
-#define RX1   18
-#define TX1   19
+#define RX1   16
+#define TX1   17
 #define SerialGPS2 Serial2  //2nd F9P 10hz relPos
-#define RX2   16
-#define TX2   17
+#define RX2   18
+#define TX2   19
 const int32_t baudGPS = 115200;
 
 #define SerialAOG Serial    //AgOpen / USB
@@ -46,7 +46,7 @@ const bool isLastSentenceGGA = true;
 //WiFi
 
 byte WiF_ipDest_ending = 255;        //ending of IP address to send UDP data to
-unsigned int portMy = 5544;          //this is port of this module
+unsigned int portMy = 5126;          //this is port of this module
 unsigned int AOGNtripPort = 2233;    //port NTRIP data from AOG comes in
 unsigned int portDestination = 9999; //Port of AOG that listens
 bool WiF_running = false;
@@ -173,7 +173,7 @@ void setup()
     pinMode(2, OUTPUT);
     digitalWrite(2, LOW);
     deBug = !digitalRead(deBugPin);
-    //deBug = true;
+    deBug = true;   //was commented
     Serial.print("deBug Status: ");
     Serial.println(deBug);
     
@@ -306,9 +306,21 @@ void setup()
     
     Serial.println("WiFi connected, sending data via USB & WiFi UDP");
     
-        WiF_ipDestination = WiFi.localIP();
-        WiF_ipDestination[3] = WiF_ipDest_ending;
+    //wm.setSTAStaticIPConfig(IPAddress(192,168,1,126), IPAddress(192,168,1,1), IPAddress(255,255,255,0)); // optional DNS 4th argument
+      
+      
+      // Serial.print("SIMO: changing IP to: ");
+                 IPAddress myIP = WiFi.localIP();
+      //           myIP[2] = 1;
+                 myIP[3] = 126;
+      //           Serial.println(myIP);
+                 IPAddress gwIP = WiFi.gatewayIP();
+                 if (!WiFi.config(myIP, gwIP, IPAddress(255,255,255,0), gwIP)) { Serial.println("STA Failed to configure"); }
+
         
+      WiF_ipDestination = WiFi.localIP();
+      WiF_ipDestination[3] = WiF_ipDest_ending;
+
       WiF_running = true;
       digitalWrite(2, HIGH);
       digitalWrite(wifLED, HIGH);
@@ -350,8 +362,10 @@ void loop()
 {
     //delay(1000);
     //Read incoming nmea from GPS
-    if (SerialGPS.available())
+    if (SerialGPS.available()){
         parser << SerialGPS.read();
+   //     if(deBug) Serial.println("SERIAL: ");
+    }
 
     //Pass NTRIP etc to GPS
     if (SerialAOG.available())
@@ -360,7 +374,7 @@ void loop()
     if (WiF_running) doWiFUDPNtrip();
 
     deBug = !digitalRead(deBugPin);
-    //deBug = true;
+    deBug = true;
     IMU_currentTime = millis();
 
 if(!useDual){
@@ -371,6 +385,7 @@ if(!useDual){
       {
         //Load up BNO08x data from gyro loop ready for takeoff
         imuHandler();
+        BuildPANDA(); //Send Panda AGGIUNTO SIMO
 
         //reset the timer 
         isTriggered = false;
@@ -464,6 +479,7 @@ void doWiFUDPNtrip() {
   if (packetLenght > 0) {
     WiF_udpNtrip.read(WiF_NTRIP_packetBuffer, packetLenght);
     SerialGPS.write(WiF_NTRIP_packetBuffer, packetLenght);
+    if(deBug) Serial.println("NTRIP: ");
   }  
 } 
 
