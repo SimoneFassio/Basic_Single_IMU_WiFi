@@ -1003,7 +1003,7 @@ void CalculateChecksum(void)
   char tmp;
 
   // The checksum calc starts after '$' and ends before '*'
-  for (inx = 1; inx < 200; inx++)
+  for (inx = 1; inx < 100; inx++)
   {
     tmp = nme[inx];
     // * Indicates end of data and start of checksum
