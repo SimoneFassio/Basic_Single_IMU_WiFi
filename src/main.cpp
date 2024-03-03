@@ -556,6 +556,7 @@ void GyroHandler(uint32_t delta)
   {
     if (bno08x.getSensorEvent(&sensorValue))
     {
+      digitalWrite(imuLED, millis() % 512 > 256);
       // in this demo only one report type will be received depending on FAST_MODE define (above)
       switch (sensorValue.sensorId)
       {
