@@ -14,13 +14,13 @@
 
 /************************* User Settings *************************/
 #define deBugPin 27
-bool deBug = true;
+bool deBug = false;
 
 // LED settings
-#define pwrLED 32
+#define pwrLED 14
 #define imuLED 26
 #define ggaLED 25
-#define wifLED 33
+#define wifLED 27
 
 // Serial Ports
 #define SerialGPS Serial1 // 1st F9P 10hz GGA,VTG + 1074,1084,1094,1230,4072.0
