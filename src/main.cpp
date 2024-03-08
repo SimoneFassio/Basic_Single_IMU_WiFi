@@ -13,14 +13,14 @@
 #include <WiFiUDP.h>
 
 /************************* User Settings *************************/
-#define deBugPin 27
+#define deBugPin 27 //not used at moment
 bool deBug = false;
 
 // LED settings
 #define pwrLED 14
 #define imuLED 26
 #define ggaLED 25
-#define wifLED 27
+#define wifLED 27 //also GPIO2 -> onBoard Led
 
 // Serial Ports
 #define SerialGPS Serial1 // 1st F9P 10hz GGA,VTG + 1074,1084,1094,1230,4072.0
@@ -225,39 +225,14 @@ void setup()
   // Wire.begin(I2C_SDA, I2C_SCL);
   // Wire.begin();
   delay(1000);
-  pinMode(26, OUTPUT);
-  pinMode(deBugPin, INPUT_PULLUP);
+  //pinMode(26, OUTPUT);
+  //pinMode(deBugPin, INPUT_PULLUP);
   pinMode(2, OUTPUT);
   digitalWrite(2, LOW);
-  deBug = !digitalRead(deBugPin);
-  deBug = true; // was commented
-  Serial.print("deBug Status: ");
-  Serial.println(deBug);
-
-  // test if CMPS working
-  // uint8_t error;
-  // if(deBug) Serial.println("Checking for CMPS14");
-  // Wire.beginTransmission(CMPS14_ADDRESS);
-  // error = Wire.endTransmission();
-
-  // if (error == 0)
-  // {
-  //     if(deBug) {
-  //       Serial.println("Error = 0");
-  //       Serial.print("CMPS14 ADDRESs: 0x");
-  //       Serial.println(CMPS14_ADDRESS, HEX);
-  //       Serial.println("CMPS14 Ok.");
-  //     }
-  //     useCMPS = true;
-  //     digitalWrite(imuLED, HIGH);
-  // }
-  // else
-  // {
-  //     if(deBug) {
-  //       Serial.println("Error = 4");
-  //       Serial.println("CMPS not Connected or Found");
-  //     }
-  // }
+  //deBug = !digitalRead(deBugPin);
+  //deBug = true; // was commented
+  //Serial.print("deBug Status: ");
+  //Serial.println(deBug);
 
   if (!useCMPS)
   {
@@ -406,8 +381,8 @@ void loop()
   if (WiF_running)
     doWiFUDPNtrip();
 
-  deBug = !digitalRead(deBugPin);
-  deBug = true;
+  //deBug = !digitalRead(deBugPin);
+  //deBug = true;
   IMU_currentTime = millis();
 
   if (!useDual)
