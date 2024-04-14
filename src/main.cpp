@@ -273,7 +273,7 @@ void setup()
     SerialGPS2.setRxBufferSize(512);
     SerialGPS2.begin(baudGPS, SERIAL_8N1, RX2, TX2);
     Serial.println("Started GPS2 ******************");
-    useDual = true;
+    //useDual = true; //provvisorio
   }
 
   // WiFi
