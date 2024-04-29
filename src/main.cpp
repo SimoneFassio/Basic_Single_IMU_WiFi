@@ -14,7 +14,7 @@
 
 /************************* User Settings *************************/
 #define deBugPin 27 //not used at moment
-bool deBug = false;
+bool deBug = true;
 
 // LED settings
 #define pwrLED 14
