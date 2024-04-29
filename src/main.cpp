@@ -85,7 +85,7 @@ bool relPosReady = false;
 #define CMPS14_ADDRESS 0x60
 
 // BNO08x address variables to check where it is
-const uint8_t bno08xAddresses[] = {0x4A, 0x4B};
+const uint8_t bno08xAddresses[] = {0x4A}; //0x4B
 const int16_t nrBNO08xAdresses = sizeof(bno08xAddresses) / sizeof(bno08xAddresses[0]);
 uint8_t bno08xAddress;
 
@@ -567,8 +567,8 @@ void GyroHandler(uint32_t delta)
       }
       else
       {
-        roll = (ypr.roll) * RAD__TO__DEG;
-        pitch = (ypr.pitch) * RAD__TO__DEG;
+        roll = (ypr.roll) * RAD__TO__DEG * -1; //invert
+        pitch = (ypr.pitch) * RAD__TO__DEG * -1; //invert
         pitch = pitch * -1;
       }
 
@@ -864,11 +864,11 @@ void imuHandler()
     itoa(temp, imuHeading, 10);
 
     // the pitch x10
-    temp = (int16_t)pitchSum;
+    temp = (int16_t)pitchSum; 
     itoa(pitch, imuPitch, 10);
 
     // the roll x10
-    temp = (int16_t)rollSum;
+    temp = (int16_t)rollSum; 
     itoa(temp, imuRoll, 10);
 
     // YawRate
