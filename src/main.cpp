@@ -224,7 +224,7 @@ void setup()
 
   // Wire.begin(I2C_SDA, I2C_SCL);
   // Wire.begin();
-  delay(1000);
+  delay(2000);
   //pinMode(26, OUTPUT);
   //pinMode(deBugPin, INPUT_PULLUP);
   pinMode(2, OUTPUT);
