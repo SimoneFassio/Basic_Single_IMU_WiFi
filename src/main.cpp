@@ -15,6 +15,7 @@
 /************************* User Settings *************************/
 #define deBugPin 27 //not used at moment
 bool deBug = false;
+bool udpNMEApassthrough = true;  //true: not using IMU, send only GGA and VTG ---- false: send PANDA
 
 // LED settings
 #define pwrLED 14
@@ -110,6 +111,12 @@ int i = 0;
 /* A parser is declared with 3 handlers at most */
 NMEAParser<2> parser;
 
+bool gotCR = false;
+bool gotLF = false;
+bool gotDollar = false;
+char msgBuf[254];
+int msgBufLen = 0;
+
 bool isTriggered = false, blink;
 
 // 100hz summing of gyro
@@ -192,6 +199,7 @@ void GyroHandler(uint32_t delta);
 void checksum();
 void relPosDecode();
 void CalculateChecksum();
+void passthroughSerial(char incoming);
 
 // Begin Setup ----------------------------------------------------------------
 
@@ -231,8 +239,11 @@ void setup()
   digitalWrite(2, LOW);
   //deBug = !digitalRead(deBugPin);
   //deBug = true; // was commented
-  //Serial.print("deBug Status: ");
-  //Serial.println(deBug);
+  Serial.print("deBug Status: ");
+  Serial.println(deBug);
+
+  if(udpNMEApassthrough)
+    Serial.println("Sending GGA and VTG, no IMU");
 
   if (!useCMPS)
   {
@@ -370,7 +381,11 @@ void loop()
   // Read incoming nmea from GPS
   if (SerialGPS.available())
   {
-    parser << SerialGPS.read();
+    if(udpNMEApassthrough){
+      passthroughSerial(SerialGPS.read());
+    }
+    else
+      parser << SerialGPS.read();
     //     if(deBug) Serial.println("SERIAL: ");
   }
 
@@ -685,6 +700,57 @@ void relPosDecode()
   {
     if (deBug)
       Serial.println("Dual Accuracy Not Good");
+  }
+}
+
+void passthroughSerial(char incoming){
+  switch (incoming)
+  {
+  case '$':
+    msgBuf[msgBufLen] = incoming;
+    msgBufLen++;
+    gotDollar = true;
+    break;
+  case '\r':
+    msgBuf[msgBufLen] = incoming;
+    msgBufLen++;
+    gotCR = true;
+    gotDollar = false;
+    break;
+  case '\n':
+    msgBuf[msgBufLen] = incoming;
+    msgBufLen++;
+    gotLF = true;
+    gotDollar = false;
+    break;
+  default:
+    if (gotDollar)
+    {
+      msgBuf[msgBufLen] = incoming;
+      msgBufLen++;
+    }
+    break;
+  }
+  if (gotCR && gotLF)
+  {
+    // Serial.print(msgBuf);
+    // Serial.println(msgBufLen);
+    //if (sendUSB)
+    //{
+    SerialAOG.write(msgBuf);
+    //} // Send USB GPS data if enabled in user settings
+    if (WiF_running)
+    {
+      WiF_udpPAOGI.beginPacket(WiF_ipDestination, portDestination);
+      WiF_udpPAOGI.print(msgBuf);
+      WiF_udpPAOGI.endPacket();
+    }
+    gotCR = false;
+    gotLF = false;
+    gotDollar = false;
+    memset(msgBuf, 0, 254);
+    msgBufLen = 0;
+    digitalWrite(ggaLED, millis() % 512 > 256);
   }
 }
 
